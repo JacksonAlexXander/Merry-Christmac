@@ -70,6 +70,22 @@
   .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .preview :is(video, canvas) { transform: scaleX(-1); }
   .gesture::after { content: ""; display: block; clear: both; }
+  .soundtrack {
+    width: min(100%, 350px); margin-top: 17px; color: #e2d4b9;
+    border-top: 1px solid #b5955b42; text-align: left;
+  }
+  .soundtrack summary {
+    display: flex; align-items: center; gap: 9px; padding: 10px 0;
+    list-style: none; cursor: pointer; font-size: 12px;
+  }
+  .soundtrack summary::-webkit-details-marker { display: none; }
+  .soundtrack summary::before { content: "♪"; color: #edc37d; font-size: 17px; }
+  .soundtrack summary::after { content: "+"; color: #edc37d; margin-left: auto; font-size: 16px; }
+  .soundtrack[open] summary::after { content: "−"; }
+  .soundtrack summary:focus-visible { outline: 2px solid #f2c97e; outline-offset: 4px; }
+  .soundtrack-title { color: #edc37d; }
+  .soundtrack iframe { display: block; width: 100%; height: 175px; border: 0; border-radius: 9px; }
+  .soundtrack a { display: inline-block; margin-top: 6px; color: #e2d4b9; font-size: 11px; }
   .tree-stage {
     align-self: center; width: 100%; height: min(83svh, 850px); min-height: 380px;
     position: relative; min-width: 0; overflow: clip; isolation: isolate;
@@ -156,6 +172,7 @@
     .zoom { margin: 13px auto 0; }
     .gesture { margin: 10px auto 0; }
     .preview { float: none; margin: 0 auto 5px; width: 88px; }
+    .soundtrack { margin: 12px auto 0; }
     .tree-stage { height: 100%; min-height: 285px; }
     .hint { grid-column: 1; bottom: 17px; }
   }
@@ -187,6 +204,15 @@
       <p id="camera-status" role="status"></p>
       <a id="online-card" href="https://jacksonalexxander.github.io/Merry-Christmac/" hidden>打开支持摄像头的在线版</a>
     </div>
+    <details class="soundtrack" id="soundtrack">
+      <summary><span class="soundtrack-title">背景音乐</span><span>至少还有你 · 林忆莲</span></summary>
+      <iframe id="soundtrack-player"
+              title="Apple Music 播放器：林忆莲《至少还有你》"
+              data-src="https://embed.music.apple.com/cn/album/905222890?i=905222894&amp;theme=dark"
+              allow="autoplay *; encrypted-media *; clipboard-write"
+              sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation"></iframe>
+      <a href="https://music.apple.com/cn/song/905222894" target="_blank" rel="noopener">在 Apple Music 中打开</a>
+    </details>
   </section>
   <div class="tree-stage">
     <canvas id="tree" tabindex="0" aria-label="闪烁的三维圣诞树，使用左右方向键旋转"
@@ -228,6 +254,12 @@ const skyCanvas = document.querySelector("#sky");
 const play = document.querySelector("#play");
 const zoomControl = document.querySelector("#zoom");
 const zoomValue = document.querySelector("#zoom-value");
+const soundtrack = document.querySelector("#soundtrack");
+const soundtrackPlayer = document.querySelector("#soundtrack-player");
+soundtrack.addEventListener("toggle", () => {
+  if (soundtrack.open) soundtrackPlayer.src = soundtrackPlayer.dataset.src;
+  else soundtrackPlayer.removeAttribute("src");
+});
 const ctx = treeCanvas.getContext("2d");
 const sky = skyCanvas.getContext("2d");
 const giftLayer = document.querySelector("#gifts");
