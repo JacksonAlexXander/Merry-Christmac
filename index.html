@@ -47,7 +47,28 @@
     background: #0b1819; cursor: pointer;
   }
   button:hover { background: #24332b; border-color: #e6bd7b; }
-  button:focus-visible, #tree:focus-visible { outline: 2px solid #f2c97e; outline-offset: 4px; }
+  #camera {
+    color: #20170e; background: #edc37d; border-color: #edc37d; font-weight: 650;
+  }
+  #camera:hover { background: #ffda98; }
+  :is(button, input, a, #tree):focus-visible { outline: 2px solid #f2c97e; outline-offset: 4px; }
+  .zoom {
+    display: flex; align-items: center; gap: 11px; margin-top: 18px;
+    color: #e2d4b9; font-size: 12px; width: min(100%, 260px);
+  }
+  .zoom input { flex: 1; min-width: 0; margin: 0; accent-color: #edc37d; cursor: pointer; }
+  #zoom-value { font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
+  .gesture { margin-top: 15px; width: min(100%, 335px); }
+  .gesture p { margin: 0; color: #c1c2ae; font-size: 12px; line-height: 1.7; }
+  .gesture a { color: #edc37d; font-size: 12px; }
+  .preview {
+    position: relative; float: left; width: 106px; margin: 1px 13px 0 0;
+    background: #101c1e; border: 1px solid #b5955b68; border-radius: 5px; overflow: hidden;
+  }
+  .preview video { width: 100%; display: block; }
+  .preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .preview :is(video, canvas) { transform: scaleX(-1); }
+  .gesture::after { content: ""; display: block; clear: both; }
   #tree {
     align-self: center; width: 100%; height: min(83svh, 850px); min-height: 380px;
     cursor: grab; touch-action: pan-y; display: block;
@@ -73,7 +94,10 @@
     .wish { margin-top: 13px; font-size: 11px; }
     .controls { justify-content: center; margin-top: 14px; }
     button { min-height: 38px; }
-    #tree { height: clamp(270px, calc(100svh - 218px), 790px); min-height: 0; }
+    .zoom { margin: 13px auto 0; }
+    .gesture { margin: 10px auto 0; }
+    .preview { float: none; margin: 0 auto 5px; width: 88px; }
+    #tree { height: 100%; min-height: 285px; }
     .hint { grid-column: 1; bottom: 17px; }
   }
 </style>
@@ -85,7 +109,24 @@
     <div class="motif" aria-hidden="true">✦</div>
     <h1 lang="en"><span>Merry</span> <em>Christmas</em></h1>
     <p class="wish">愿你有个温暖的圣诞节</p>
-    <div class="controls"><button id="play" type="button">暂停动画</button></div>
+    <div class="controls">
+      <button id="camera" type="button" aria-describedby="camera-help">开启手势</button>
+      <button id="play" type="button">暂停动画</button>
+    </div>
+    <div class="zoom">
+      <label for="zoom">缩放</label>
+      <input id="zoom" type="range" min="70" max="122" value="100">
+      <span id="zoom-value" aria-hidden="true">100%</span>
+    </div>
+    <div class="gesture">
+      <div class="preview" id="preview" hidden>
+        <video id="camera-video" autoplay muted playsinline aria-hidden="true"></video>
+        <canvas id="camera-overlay" aria-hidden="true"></canvas>
+      </div>
+      <p id="camera-help">张开拇指和食指放大，捏近缩小。</p>
+      <p id="camera-status" role="status"></p>
+      <a id="online-card" href="https://jacksonalexxander.github.io/Merry-Christmac/" hidden>打开支持摄像头的在线版</a>
+    </div>
   </section>
   <canvas id="tree" tabindex="0" aria-label="闪烁的三维圣诞树，使用左右方向键旋转"
           aria-describedby="hint">这是一棵点缀彩灯和金色星星的圣诞树。</canvas>
@@ -99,6 +140,8 @@ const {tree, snow} = JSON.parse(document.querySelector("#scene").textContent);
 const treeCanvas = document.querySelector("#tree");
 const skyCanvas = document.querySelector("#sky");
 const play = document.querySelector("#play");
+const zoomControl = document.querySelector("#zoom");
+const zoomValue = document.querySelector("#zoom-value");
 const ctx = treeCanvas.getContext("2d");
 const sky = skyCanvas.getContext("2d");
 const PALETTE = [
@@ -131,6 +174,7 @@ let elapsed = 0;
 let previous = 0;
 let frame = 0;
 let pointer = null;
+let treeZoom = 1;
 let width, height, skyWidth, skyHeight;
 
 function fitCanvas(canvas, context) {
@@ -188,7 +232,7 @@ function drawStar(x, y, radius) {
 
 function drawTree() {
   ctx.clearRect(0, 0, width, height);
-  const scale = Math.min(height / 4.25, width / 2.85);
+  const scale = Math.min(height / 4.85, width / 3.1) * treeZoom;
   if (scale <= 0) return;
   const cx = width * 0.5;
   const cy = height * 0.535;
@@ -264,9 +308,21 @@ function resize() {
   draw();
 }
 
+const minZoom = Number(zoomControl.min) / 100;
+const maxZoom = Number(zoomControl.max) / 100;
+
+function setZoom(value) {
+  treeZoom = Math.max(minZoom, Math.min(maxZoom, value));
+  const percent = Math.round(treeZoom * 100);
+  zoomControl.value = percent;
+  zoomValue.textContent = percent + "%";
+  if (!playing) drawTree();
+}
+
+zoomControl.addEventListener("input", () => setZoom(Number(zoomControl.value) / 100));
 play.addEventListener("click", () => setPlaying(!playing));
 motion.addEventListener("change", (event) => setPlaying(!event.matches));
-window.addEventListener("resize", resize);
+new ResizeObserver(resize).observe(treeCanvas);
 treeCanvas.addEventListener("pointerdown", (event) => {
   if (!event.isPrimary || event.button !== 0) return;
   pointer = event.clientX;
@@ -290,6 +346,168 @@ treeCanvas.addEventListener("keydown", (event) => {
 
 resize();
 setPlaying(playing);
+</script>
+<script type="module">
+const cameraButton = document.querySelector("#camera");
+const cameraStatus = document.querySelector("#camera-status");
+const onlineCard = document.querySelector("#online-card");
+const preview = document.querySelector("#preview");
+const video = document.querySelector("#camera-video");
+const overlay = document.querySelector("#camera-overlay");
+const overlayContext = overlay.getContext("2d");
+const assets = new URL("./hand-tracking/", location.href);
+let session = null;
+let modelPromise = null;
+
+function report(message) {
+  if (cameraStatus.textContent !== message) cameraStatus.textContent = message;
+}
+
+function loadModel() {
+  if (!modelPromise) {
+    modelPromise = (async () => {
+      const {FilesetResolver, HandLandmarker} = await import(new URL("vision_bundle.mjs", assets).href);
+      const files = await FilesetResolver.forVisionTasks(new URL("wasm", assets).href);
+      return HandLandmarker.createFromOptions(files, {
+        baseOptions: {modelAssetPath: new URL("hand_landmarker.task", assets).href, delegate: "CPU"},
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.55,
+        minHandPresenceConfidence: 0.55,
+        minTrackingConfidence: 0.55
+      });
+    })().catch((error) => {
+      modelPromise = null;
+      throw error;
+    });
+  }
+  return modelPromise;
+}
+
+function stopCamera(message = "") {
+  if (session) {
+    cancelAnimationFrame(session.frame);
+    session.stream?.getTracks().forEach((track) => track.stop());
+    session = null;
+  }
+  video.srcObject = null;
+  preview.hidden = true;
+  cameraButton.textContent = "开启手势";
+  report(message);
+}
+
+function drawFingertips(hand) {
+  if (overlay.width !== video.videoWidth || overlay.height !== video.videoHeight) {
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+  }
+  const {width, height} = overlay;
+  overlayContext.clearRect(0, 0, width, height);
+  if (!hand) return;
+  const tips = [hand[4], hand[8]];
+  overlayContext.beginPath();
+  overlayContext.moveTo(tips[0].x * width, tips[0].y * height);
+  overlayContext.lineTo(tips[1].x * width, tips[1].y * height);
+  overlayContext.lineWidth = width * 0.014;
+  overlayContext.strokeStyle = "#ffdb92";
+  overlayContext.stroke();
+  overlayContext.fillStyle = "#fff1bd";
+  for (const {x, y} of tips) {
+    overlayContext.beginPath();
+    overlayContext.arc(x * width, y * height, width * 0.017, 0, Math.PI * 2);
+    overlayContext.fill();
+  }
+}
+
+function trackZoom(hand) {
+  const aspect = video.videoWidth / video.videoHeight;
+  const distance = (a, b) => Math.hypot((hand[a].x - hand[b].x) * aspect, hand[a].y - hand[b].y);
+  // Use the palm as a reference so moving toward the camera has less effect.
+  const palm = (distance(0, 9) + distance(5, 17)) / 2;
+  if (palm < 0.038) {
+    report("请把整只手移近镜头。");
+    return;
+  }
+  const opening = distance(4, 8) / palm;
+  const fraction = Math.max(0, Math.min(1, (opening - 0.10) / 0.99));
+  const target = minZoom + fraction * (maxZoom - minZoom);
+  const delta = target - treeZoom;
+  report("已识别手势");
+  if (Math.abs(delta) > 0.002) setZoom(treeZoom + delta * 0.27);
+}
+
+function trackFrame(current, model, now) {
+  if (session !== current) return;
+  if (now - current.lastSample >= 66 && video.readyState >= 2 && video.currentTime !== current.lastVideoTime) {
+    current.lastSample = now;
+    current.lastVideoTime = video.currentTime;
+    try {
+      const hand = model.detectForVideo(video, now).landmarks[0];
+      drawFingertips(hand);
+      if (hand) trackZoom(hand);
+      else report("请将一只手放入画面。");
+    } catch (error) {
+      console.error(error);
+      stopCamera("手势识别中断，可以重试或用滑杆缩放。");
+      return;
+    }
+  }
+  current.frame = requestAnimationFrame((time) => trackFrame(current, model, time));
+}
+
+async function startCamera() {
+  if (location.protocol === "file:") {
+    onlineCard.hidden = false;
+    return;
+  }
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    report("请用支持摄像头的浏览器打开 HTTPS 页面。");
+    return;
+  }
+  const current = {stream: null, frame: 0, lastSample: 0, lastVideoTime: -1};
+  session = current;
+  cameraButton.textContent = "关闭手势";
+  report("等待摄像头权限…");
+  let modelStage = false;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {width: {ideal: 480}, height: {ideal: 360}, frameRate: {ideal: 24, max: 30}},
+      audio: false
+    });
+    if (session !== current) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    current.stream = stream;
+    stream.getVideoTracks()[0].addEventListener("ended", () => {
+      if (session === current) stopCamera("摄像头已断开，可以重新开启手势。");
+    });
+    video.srcObject = stream;
+    await video.play();
+    if (session !== current) return;
+    overlayContext.clearRect(0, 0, overlay.width, overlay.height);
+    preview.hidden = false;
+    modelStage = true;
+    report("正在加载手部识别模型…");
+    const model = await loadModel();
+    if (session !== current) return;
+    report("请将一只手放入画面。");
+    current.frame = requestAnimationFrame((time) => trackFrame(current, model, time));
+  } catch (error) {
+    if (session !== current) return;
+    console.error(error);
+    if (modelStage) stopCamera("手势模型加载失败，可以重试或用滑杆缩放。");
+    else if (error.name === "NotAllowedError") stopCamera("请在浏览器地址栏允许使用摄像头，再试一次。");
+    else if (error.name === "NotFoundError") stopCamera("未找到摄像头，可以用滑杆缩放。");
+    else stopCamera("摄像头无法开启，请确认它可用后重试。");
+  }
+}
+
+cameraButton.addEventListener("click", () => {
+  if (session) stopCamera("摄像头已关闭");
+  else startCamera();
+});
+window.addEventListener("pagehide", () => stopCamera());
 </script>
 </body>
 </html>
